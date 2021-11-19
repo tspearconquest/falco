@@ -517,13 +517,12 @@
   condition: >
     ((evt.type = container or
      (spawned_process and proc.vpid=1)) and
-      container.image.repository != incomplete)
+     container.image.repository != incomplete)
 
 - macro: interactive
   condition: >
     ((proc.aname=sshd and proc.name != sshd) or
-      proc.name=systemd-logind or
-      proc.name=login)
+    proc.name=systemd-logind or proc.name=login)
 
 - list: cron_binaries
   items: [anacron, cron, crond, crontab]
@@ -2899,7 +2898,7 @@
 # - k8s.gcr.io/fluentd-gcp-scaler in GCP/GKE
 - macro: user_known_k8s_client_container
   condition: >
-    (k8s.ns.name="kube-system" and container.image.repository in (user_known_k8s_ns_kube_system_images))or container.image.repository in (user_known_k8s_images)
+    (k8s.ns.name="kube-system" and container.image.repository in (user_known_k8s_ns_kube_system_images)) or container.image.repository in (user_known_k8s_images)
 
 - macro: user_known_k8s_client_container_parens
   condition: (user_known_k8s_client_container)
