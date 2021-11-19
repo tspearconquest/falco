@@ -356,7 +356,10 @@
 
 - rule: Disallowed SSH Connection
   desc: Detect any new ssh connection to a host other than those in an allowed group of hosts
-  condition: (inbound_outbound) and ssh_port and not allowed_ssh_hosts
+  condition: >
+    (inbound_outbound)
+    and ssh_port
+    and not allowed_ssh_hosts
   output: Disallowed SSH Connection (command=%proc.cmdline connection=%fd.name user=%user.name user_loginuid=%user.loginuid container_id=%container.id image=%container.image.repository)
   priority: NOTICE
   tags: [network, mitre_remote_service]
@@ -384,10 +387,11 @@
 - rule: Unexpected outbound connection destination
   desc: Detect any outbound connection to a destination outside of an allowed set of ips, networks, or domain names
   condition: >
-    consider_all_outbound_conns and outbound and not
-    ((fd.sip in (allowed_outbound_destination_ipaddrs)) or
-     (fd.snet in (allowed_outbound_destination_networks)) or
-     (fd.sip.name in (allowed_outbound_destination_domains)))
+    consider_all_outbound_conns
+    and outbound
+    and not ((fd.sip in (allowed_outbound_destination_ipaddrs)) or
+             (fd.snet in (allowed_outbound_destination_networks)) or
+             (fd.sip.name in (allowed_outbound_destination_domains)))
   output: Disallowed outbound connection destination (command=%proc.cmdline connection=%fd.name user=%user.name user_loginuid=%user.loginuid container_id=%container.id image=%container.image.repository)
   priority: NOTICE
   tags: [network]
@@ -407,10 +411,11 @@
 - rule: Unexpected inbound connection source
   desc: Detect any inbound connection from a source outside of an allowed set of ips, networks, or domain names
   condition: >
-    consider_all_inbound_conns and inbound and not
-    ((fd.cip in (allowed_inbound_source_ipaddrs)) or
-     (fd.cnet in (allowed_inbound_source_networks)) or
-     (fd.cip.name in (allowed_inbound_source_domains)))
+    consider_all_inbound_conns
+    and inbound
+    and not ((fd.cip in (allowed_inbound_source_ipaddrs)) or
+             (fd.cnet in (allowed_inbound_source_networks)) or
+             (fd.cip.name in (allowed_inbound_source_domains)))
   output: Disallowed inbound connection source (command=%proc.cmdline connection=%fd.name user=%user.name user_loginuid=%user.loginuid container_id=%container.id image=%container.image.repository)
   priority: NOTICE
   tags: [network]
@@ -465,12 +470,12 @@
 - rule: Read Shell Configuration File
   desc: Detect attempts to read shell configuration files by non-shell programs
   condition: >
-    open_read and
-    consider_shell_config_reads and
-    (fd.filename in (shell_config_filenames) or
-     fd.name in (shell_config_files) or
-     fd.directory in (shell_config_directories)) and
-    (not proc.name in (shell_binaries))
+    open_read
+    and consider_shell_config_reads
+    and (fd.filename in (shell_config_filenames) or
+         fd.name in (shell_config_files) or
+         fd.directory in (shell_config_directories))
+    and not proc.name in (shell_binaries)
   output: >
     a shell configuration file was read by a non-shell program (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline file=%fd.name container_id=%container.id image=%container.image.repository)
   priority:
@@ -487,9 +492,9 @@
   desc: Detect cron jobs scheduled
   condition: >
     ((open_write and fd.name startswith /etc/cron) or
-     (spawned_process and proc.name = "crontab")) and
-    consider_all_cron_jobs and
-    not user_known_cron_jobs
+     (spawned_process and proc.name = "crontab"))
+    and consider_all_cron_jobs
+    and not user_known_cron_jobs
   output: >
     Cron jobs were scheduled to run (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline
     file=%fd.name container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)
@@ -512,12 +517,13 @@
   condition: >
     ((evt.type = container or
      (spawned_process and proc.vpid=1)) and
-     container.image.repository != incomplete)
+      container.image.repository != incomplete)
 
 - macro: interactive
   condition: >
     ((proc.aname=sshd and proc.name != sshd) or
-    proc.name=systemd-logind or proc.name=login)
+      proc.name=systemd-logind or
+      proc.name=login)
 
 - list: cron_binaries
   items: [anacron, cron, crond, crontab]
@@ -861,7 +867,8 @@
 - rule: Update Package Repository
   desc: Detect package repositories get updated
   condition: >
-    ((open_write and access_repositories) or (modify and modify_repositories))
+    ((open_write and access_repositories) or
+     (modify and modify_repositories))
     and not package_mgmt_procs
     and not package_mgmt_ancestor_procs
     and not exe_running_docker_save
@@ -881,7 +888,9 @@
 - rule: Write below binary dir
   desc: an attempt to write to any file below a set of binary directories
   condition: >
-    bin_dir and evt.dir = < and open_write
+    bin_dir
+    and evt.dir = <
+    and open_write
     and not package_mgmt_procs
     and not exe_running_docker_save
     and not python_running_get_pip
@@ -931,7 +940,9 @@
 - rule: Write below monitored dir
   desc: an attempt to write to any file below a set of monitored directories
   condition: >
-    evt.dir = < and open_write and monitored_dir
+    evt.dir = <
+    and open_write
+    and monitored_dir
     and not package_mgmt_procs
     and not coreos_write_ssh_dir
     and not exe_running_docker_save
@@ -958,11 +969,11 @@
 - rule: Read ssh information
   desc: Any attempt to read files below ssh directories by non-ssh programs
   condition: >
-    ((open_read or open_directory) and
-     consider_ssh_reads and
-     (user_ssh_directory or fd.name startswith /root/.ssh) and
-     not user_known_read_ssh_information_activities and
-     not proc.name in (ssh_binaries))
+    ((open_read or open_directory)
+     and consider_ssh_reads
+     and (user_ssh_directory or fd.name startswith /root/.ssh)
+     and not user_known_read_ssh_information_activities
+     and not proc.name in (ssh_binaries))
   output: >
     ssh-related file/directory read by non-ssh program (user=%user.name user_loginuid=%user.loginuid
     command=%proc.cmdline file=%fd.name parent=%proc.pname pcmdline=%proc.pcmdline container_id=%container.id image=%container.image.repository)
@@ -1245,7 +1256,8 @@
 
 - rule: Write below etc
   desc: an attempt to write to any file below /etc
-  condition: write_etc_common
+  condition: >
+    write_etc_common
   output: "File below /etc opened for writing (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline parent=%proc.pname pcmdline=%proc.pcmdline file=%fd.name program=%proc.name gparent=%proc.aname[2] ggparent=%proc.aname[3] gggparent=%proc.aname[4] container_id=%container.id image=%container.image.repository)"
   priority: ERROR
   tags: [filesystem, mitre_persistence]
@@ -1321,7 +1333,9 @@
 - rule: Write below root
   desc: an attempt to write to any file directly below / or /root
   condition: >
-    root_dir and evt.dir = < and open_write
+    root_dir
+    and evt.dir = <
+    and open_write
     and proc_name_exists
     and not fd.name in (known_root_files)
     and not fd.directory pmatch (known_root_directories)
@@ -1406,14 +1420,13 @@
     an attempt to read any sensitive file (e.g. files containing user/password/authentication
     information). Exceptions are made for known trusted programs.
   condition: >
-    sensitive_files and open_read
+    sensitive_files
+    and open_read
     and proc_name_exists
     and not proc.name in (user_mgmt_binaries, userexec_binaries, package_mgmt_binaries,
-     cron_binaries, read_sensitive_file_binaries, shell_binaries, hids_binaries,
-     vpn_binaries, mail_config_binaries, nomachine_binaries, sshkit_script_binaries,
-     in.proftpd, mandb, salt-minion, postgres_mgmt_binaries,
-     google_oslogin_
-     )
+                          cron_binaries, read_sensitive_file_binaries, shell_binaries, hids_binaries,
+                          vpn_binaries, mail_config_binaries, nomachine_binaries, sshkit_script_binaries,
+                          in.proftpd, mandb, salt-minion, postgres_mgmt_binaries, google_oslogin_)
     and not cmp_cp_by_passwd
     and not ansible_running_python
     and not run_by_qualys
@@ -1448,7 +1461,8 @@
 - rule: Write below rpm database
   desc: an attempt to write to the rpm database by any non-rpm related program
   condition: >
-    fd.name startswith /var/lib/rpm and open_write
+    fd.name startswith /var/lib/rpm
+    and open_write
     and not rpm_procs
     and not ansible_running_python
     and not python_running_chef
@@ -1503,7 +1517,12 @@
 
 - rule: Modify binary dirs
   desc: an attempt to modify any file below a set of binary directories.
-  condition: bin_dir_rename and modify and not package_mgmt_procs and not exe_running_docker_save and not user_known_modify_bin_dir_activities
+  condition: >
+    bin_dir_rename
+    and modify
+    and not package_mgmt_procs
+    and not exe_running_docker_save
+    and not user_known_modify_bin_dir_activities
   output: >
     File below known binary directory renamed/removed (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline
     pcmdline=%proc.pcmdline operation=%evt.type file=%fd.name %evt.args container_id=%container.id image=%container.image.repository)
@@ -1550,7 +1569,8 @@
     an attempt to change a program/thread\'s namespace (commonly done
     as a part of creating a container) by calling setns.
   condition: >
-    evt.type=setns and evt.dir=<
+    evt.type = setns
+    and evt.dir = <
     and proc_name_exists
     and not (container.id=host and proc.name in (docker_binaries, k8s_binaries, lxd_binaries, nsenter))
     and not proc.name in (sysdigcloud_binaries, sysdig, calico, oci-umount, cilium-cni, network_plugin_binaries)
@@ -1688,9 +1708,7 @@
     and proc.pname exists
     and protected_shell_spawner
     and not proc.pname in (shell_binaries, gitlab_binaries, cron_binaries, user_known_shell_spawn_binaries,
-                           needrestart_binaries,
-                           mesos_shell_binaries,
-                           erl_child_setup, exechealthz,
+                           needrestart_binaries, mesos_shell_binaries, erl_child_setup, exechealthz,
                            PM2, PassengerWatchd, c_rehash, svlogd, logrotate, hhvm, serf,
                            lb-controller, nvidia-installe, runsv, statsite, erlexec, calico-node,
                            "puma reactor")
@@ -1895,7 +1913,8 @@
 - rule: Launch Privileged Container
   desc: Detect the initial process started in a privileged container. Exceptions are made for known trusted images.
   condition: >
-    container_started and container
+    container_started
+    and container
     and container.privileged=true
     and not falco_privileged_containers
     and not user_privileged_containers
@@ -1939,7 +1958,8 @@
     Detect the initial process started by a container that has a mount from a sensitive host directory
     (i.e. /proc). Exceptions are made for known trusted images.
   condition: >
-    container_started and container
+    container_started
+    and container
     and sensitive_mount
     and not falco_sensitive_mount_containers
     and not user_sensitive_mount_containers
@@ -1977,7 +1997,11 @@
 
 - rule: System user interactive
   desc: an attempt to run interactive commands by a system (i.e. non-login) user
-  condition: spawned_process and system_users and interactive and not user_known_system_user_login
+  condition: >
+    spawned_process
+    and system_users
+    and interactive
+    and not user_known_system_user_login
   output: "System user ran an interactive command (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline container_id=%container.id image=%container.image.repository)"
   priority: INFO
   tags: [users, mitre_remote_access_tools]
@@ -1990,8 +2014,10 @@
 - rule: Terminal shell in container
   desc: A shell was used as the entrypoint/exec point into a container with an attached terminal.
   condition: >
-    spawned_process and container
-    and shell_procs and proc.tty != 0
+    spawned_process
+    and container
+    and shell_procs
+    and proc.tty != 0
     and container_entrypoint
     and not user_expected_terminal_shell_in_container_conditions
   output: >
@@ -2103,10 +2129,10 @@
 - rule: Program run with disallowed http proxy env
   desc: An attempt to run a program with a disallowed HTTP_PROXY environment variable
   condition: >
-    spawned_process and
-    http_proxy_procs and
-    not allowed_ssh_proxy_env and
-    proc.env icontains HTTP_PROXY
+    spawned_process
+    and http_proxy_procs
+    and not allowed_ssh_proxy_env
+    and proc.env icontains HTTP_PROXY
   output: >
     Program run with disallowed HTTP_PROXY environment variable
     (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline env=%proc.env parent=%proc.pname container_id=%container.id image=%container.image.repository)
@@ -2181,7 +2207,11 @@
 
 - rule: Unexpected UDP Traffic
   desc: UDP traffic not on port 53 (DNS) or other commonly used ports
-  condition: (inbound_outbound) and do_unexpected_udp_check and fd.l4proto=udp and not expected_udp_traffic
+  condition: >
+    (inbound_outbound)
+    and do_unexpected_udp_check
+    and fd.l4proto=udp
+    and not expected_udp_traffic
   output: >
     Unexpected UDP Traffic Seen
     (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline connection=%fd.name proto=%fd.l4proto evt=%evt.type %evt.args container_id=%container.id image=%container.image.repository)
@@ -2232,7 +2262,8 @@
     an attempt to change users by calling setuid. sudo/su are excluded. users "root" and "nobody"
     suing to itself are also excluded, as setuid calls typically involve dropping privileges.
   condition: >
-    evt.type=setuid and evt.dir=>
+    evt.type = setuid
+    and evt.dir = >
     and (known_user_in_container or not container)
     and not (user.name=root or user.uid=0)
     and not somebody_becoming_themself
@@ -2261,19 +2292,21 @@
     of a base linux distribution at startup.
     Some innocuous commandlines that don't actually change anything are excluded.
   condition: >
-    spawned_process and proc.name in (user_mgmt_binaries) and
-    not proc.name in (su, sudo, lastlog, nologin, unix_chkpwd) and not container and
-    not proc.pname in (cron_binaries, systemd, systemd.postins, udev.postinst, run-parts) and
-    not proc.cmdline startswith "passwd -S" and
-    not proc.cmdline startswith "useradd -D" and
-    not proc.cmdline startswith "systemd --version" and
-    not run_by_qualys and
-    not run_by_sumologic_securefiles and
-    not run_by_yum and
-    not run_by_ms_oms and
-    not run_by_google_accounts_daemon and
-    not chage_list and
-    not user_known_user_management_activities
+    spawned_process
+    and proc.name in (user_mgmt_binaries)
+    and not proc.name in (su, sudo, lastlog, nologin, unix_chkpwd)
+    and not container
+    and not proc.pname in (cron_binaries, systemd, systemd.postins, udev.postinst, run-parts)
+    and not proc.cmdline startswith "passwd -S"
+    and not proc.cmdline startswith "useradd -D"
+    and not proc.cmdline startswith "systemd --version"
+    and not run_by_qualys
+    and not run_by_sumologic_securefiles
+    and not run_by_yum
+    and not run_by_ms_oms
+    and not run_by_google_accounts_daemon
+    and not chage_list
+    and not user_known_user_management_activities
   output: >
     User management binary command run outside of container
     (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline parent=%proc.pname gparent=%proc.aname[2] ggparent=%proc.aname[3] gggparent=%proc.aname[4])
@@ -2294,8 +2327,8 @@
 - rule: Create files below dev
   desc: creating any files below /dev other than known programs that manage devices. Some rootkits hide files in /dev.
   condition: >
-    fd.directory = /dev and
-    (evt.type = creat or ((evt.type = open or evt.type = openat) and evt.arg.flags contains O_CREAT))
+    fd.directory = /dev
+    and (evt.type = creat or ((evt.type = open or evt.type = openat) and evt.arg.flags contains O_CREAT))
     and not proc.name in (dev_creation_binaries)
     and not fd.name in (allowed_dev_files)
     and not fd.name startswith /dev/tty
@@ -2321,7 +2354,11 @@
 # to this IP from containers.
 - rule: Contact EC2 Instance Metadata Service From Container
   desc: Detect attempts to contact the EC2 Instance Metadata Service from a container
-  condition: outbound and fd.sip="169.254.169.254" and container and not ec2_metadata_containers
+  condition: >
+    outbound
+    and fd.sip="169.254.169.254"
+    and container
+    and not ec2_metadata_containers
   output: Outbound connection to EC2 instance metadata service (command=%proc.cmdline connection=%fd.name %container.info image=%container.image.repository:%container.image.tag)
   priority: NOTICE
   tags: [network, aws, container, mitre_discovery]
@@ -2340,7 +2377,12 @@
 # metadata about the instance. The metadata could be used to get credentials by attackers.
 - rule: Contact cloud metadata service from container
   desc: Detect attempts to contact the Cloud Instance Metadata Service from a container
-  condition: outbound and fd.sip="169.254.169.254" and container and consider_metadata_access and not user_known_metadata_access
+  condition: >
+    outbound
+    and fd.sip="169.254.169.254"
+    and container
+    and consider_metadata_access
+    and not user_known_metadata_access
   output: Outbound connection to cloud instance metadata service (command=%proc.cmdline connection=%fd.name %container.info image=%container.image.repository:%container.image.tag)
   priority: NOTICE
   tags: [network, container, mitre_discovery]
@@ -2375,12 +2417,13 @@
 - rule: Contact K8S API Server From Container
   desc: Detect attempts to contact the K8S API Server from a container
   condition: >
-    evt.type=connect and evt.dir=< and
-    (fd.typechar=4 or fd.typechar=6) and
-    container and
-    not k8s_containers and
-    k8s_api_server and
-    not user_known_contact_k8s_api_server_activities
+    evt.type = connect
+    and evt.dir = <
+    and (fd.typechar=4 or fd.typechar=6)
+    and container
+    and not k8s_containers
+    and k8s_api_server
+    and not user_known_contact_k8s_api_server_activities
   output: Unexpected connection to K8s API Server from container (command=%proc.cmdline %container.info image=%container.image.repository:%container.image.tag connection=%fd.name)
   priority: NOTICE
   tags: [network, k8s, container, mitre_discovery]
@@ -2396,7 +2439,12 @@
 
 - rule: Unexpected K8s NodePort Connection
   desc: Detect attempts to use K8s NodePorts from a container
-  condition: (inbound_outbound) and fd.sport >= 30000 and fd.sport <= 32767 and container and not nodeport_containers
+  condition: >
+    (inbound_outbound)
+    and fd.sport >= 30000
+    and fd.sport <= 32767
+    and container
+    and not nodeport_containers
   output: Unexpected K8s NodePort Connection (command=%proc.cmdline connection=%fd.name container_id=%container.id image=%container.image.repository)
   priority: NOTICE
   tags: [network, k8s, container, mitre_port_knocking]
@@ -2435,11 +2483,11 @@
 - rule: Netcat Remote Code Execution in Container
   desc: Netcat Program runs inside container that allows remote code execution
   condition: >
-    spawned_process and container and
-    ((proc.name = "nc" and (proc.args contains "-e" or proc.args contains "-c")) or
-     (proc.name = "ncat" and (proc.args contains "--sh-exec" or proc.args contains "--exec" or proc.args contains "-e "
-                              or proc.args contains "-c " or proc.args contains "--lua-exec"))
-    )
+    spawned_process
+    and container
+    and ((proc.name = "nc" and (proc.args contains "-e" or proc.args contains "-c")) or
+         (proc.name = "ncat" and (proc.args contains "--sh-exec" or proc.args contains "--exec" or proc.args contains "-e " or
+                                  proc.args contains "-c " or proc.args contains "--lua-exec")))
   output: >
     Netcat runs inside container that allows remote code execution (user=%user.name user_loginuid=%user.loginuid
     command=%proc.cmdline container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)
@@ -2452,7 +2500,10 @@
 - rule: Launch Suspicious Network Tool in Container
   desc: Detect network tools launched inside container
   condition: >
-    spawned_process and container and network_tool_procs and not user_known_network_tool_activities
+    spawned_process
+    and container
+    and network_tool_procs
+    and not user_known_network_tool_activities
   output: >
     Network tool launched in container (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline parent_process=%proc.pname
     container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)
@@ -2468,11 +2519,11 @@
 - rule: Launch Suspicious Network Tool on Host
   desc: Detect network tools launched on the host
   condition: >
-    spawned_process and
-    not container and
-    consider_network_tools_on_host and
-    network_tool_procs and
-    not user_known_network_tool_activities
+    spawned_process
+    and not container
+    and consider_network_tools_on_host
+    and network_tool_procs
+    and not user_known_network_tool_activities
   output: >
     Network tool launched on host (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline parent_process=%proc.pname)
   priority: NOTICE
@@ -2506,8 +2557,7 @@
   condition: >
     (spawned_process and
      ((grep_commands and private_key_or_password) or
-      (proc.name = "find" and (proc.args contains "id_rsa" or proc.args contains "id_dsa")))
-    )
+      (proc.name = "find" and (proc.args contains "id_rsa" or proc.args contains "id_dsa"))))
   output: >
     Grep private keys or passwords activities found
     (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline container_id=%container.id container_name=%container.name
@@ -2538,11 +2588,11 @@
 - rule: Clear Log Activities
   desc: Detect clearing of critical log files
   condition: >
-    open_write and
-    access_log_files and
-    evt.arg.flags contains "O_TRUNC" and
-    not trusted_logging_images and
-    not allowed_clear_log_files
+    open_write
+    and access_log_files
+    and evt.arg.flags contains "O_TRUNC"
+    and not trusted_logging_images
+    and not allowed_clear_log_files
   output: >
     Log files were tampered (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline file=%fd.name container_id=%container.id image=%container.image.repository)
   priority:
@@ -2560,7 +2610,10 @@
 
 - rule: Remove Bulk Data from Disk
   desc: Detect process running to clear bulk data from disk
-  condition: spawned_process and clear_data_procs and not user_known_remove_data_activities
+  condition: >
+    spawned_process
+    and clear_data_procs
+    and not user_known_remove_data_activities
   output: >
     Bulk data has been removed from disk (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline file=%fd.name container_id=%container.id image=%container.image.repository)
   priority:
@@ -2597,9 +2650,9 @@
 - rule: Delete or rename shell history
   desc: Detect shell history deletion
   condition: >
-    (modify_shell_history or truncate_shell_history) and
-       not var_lib_docker_filepath and
-       not proc.name in (docker_binaries)
+    (modify_shell_history or truncate_shell_history)
+    and not var_lib_docker_filepath
+    and not proc.name in (docker_binaries)
   output: >
     Shell history had been deleted or renamed (user=%user.name user_loginuid=%user.loginuid type=%evt.type command=%proc.cmdline fd.name=%fd.name name=%evt.arg.name path=%evt.arg.path oldpath=%evt.arg.oldpath %container.info)
   priority:
@@ -2637,7 +2690,9 @@
     this means that the application will run with the privileges of the owning user or group respectively.
     Detect setuid or setgid bits set via chmod
   condition: >
-    consider_all_chmods and chmod and (evt.arg.mode contains "S_ISUID" or evt.arg.mode contains "S_ISGID")
+    consider_all_chmods
+    and chmod
+    and (evt.arg.mode contains "S_ISUID" or evt.arg.mode contains "S_ISGID")
     and not proc.name in (user_known_chmod_applications)
     and not exe_running_docker_save
     and not user_known_set_setuid_or_setgid_bit_conditions
@@ -2664,9 +2719,9 @@
   condition: >
     ((modify and evt.arg.newpath contains "/.") or
      (mkdir and evt.arg.path contains "/.") or
-     (open_write and evt.arg.flags contains "O_CREAT" and fd.name contains "/." and not fd.name pmatch (exclude_hidden_directories))) and
-    consider_hidden_file_creation and
-    not user_known_create_hidden_file_activities
+     (open_write and evt.arg.flags contains "O_CREAT" and fd.name contains "/." and not fd.name pmatch (exclude_hidden_directories)))
+    and consider_hidden_file_creation
+    and not user_known_create_hidden_file_activities
     and not exe_running_docker_save
   output: >
     Hidden file or directory created (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline
@@ -2702,8 +2757,8 @@
 - rule: Create Symlink Over Sensitive Files
   desc: Detect symlink created over sensitive files
   condition: >
-    create_symlink and
-    (evt.arg.target in (sensitive_file_names) or evt.arg.target in (sensitive_directory_names))
+    create_symlink
+    and (evt.arg.target in (sensitive_file_names) or evt.arg.target in (sensitive_directory_names))
   output: >
     Symlinks created over senstivie files (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline target=%evt.arg.target linkpath=%evt.arg.linkpath parent_process=%proc.pname)
   priority: NOTICE
@@ -2809,16 +2864,20 @@
 # Note: falco will send DNS request to resolve miner pool domain which may trigger alerts in your environment.
 - rule: Detect outbound connections to common miner pool ports
   desc: Miners typically connect to miner pools on common ports.
-  condition: net_miner_pool and not trusted_images_query_miner_domain_dns
+  condition: >
+    net_miner_pool
+    and not trusted_images_query_miner_domain_dns
   enabled: false
-  output: Outbound connection to IP/Port flagged by cryptoioc.ch (command=%proc.cmdline port=%fd.rport ip=%fd.rip container=%container.info image=%container.image.repository)
+  output: Outbound connection to IP/Port flagged by cryptoioc.ch (command=%proc.cmdline port=%fd.rport ip=%fd.rip %container.info image=%container.image.repository)
   priority: CRITICAL
   tags: [network, mitre_execution]
 
 - rule: Detect crypto miners using the Stratum protocol
   desc: Miners typically specify the mining pool to connect to with a URI that begins with 'stratum+tcp'
-  condition: spawned_process and proc.cmdline contains "stratum+tcp"
-  output: Possible miner running (command=%proc.cmdline container=%container.info image=%container.image.repository)
+  condition: >
+    spawned_process
+    and proc.cmdline contains "stratum+tcp"
+  output: Possible miner running (command=%proc.cmdline %container.info image=%container.image.repository)
   priority: CRITICAL
   tags: [process, mitre_execution]
 
@@ -2840,14 +2899,18 @@
 # - k8s.gcr.io/fluentd-gcp-scaler in GCP/GKE
 - macro: user_known_k8s_client_container
   condition: >
-    (k8s.ns.name="kube-system" and container.image.repository in (user_known_k8s_ns_kube_system_images)) or container.image.repository in (user_known_k8s_images)
+    (k8s.ns.name="kube-system" and container.image.repository in (user_known_k8s_ns_kube_system_images))or container.image.repository in (user_known_k8s_images)
 
 - macro: user_known_k8s_client_container_parens
   condition: (user_known_k8s_client_container)
 
 - rule: The docker client is executed in a container
   desc: Detect a k8s client tool executed inside a container
-  condition: spawned_process and container and not user_known_k8s_client_container_parens and proc.name in (k8s_client_binaries)
+  condition: >
+    spawned_process
+    and container
+    and not user_known_k8s_client_container_parens
+    and proc.name in (k8s_client_binaries)
   output: "Docker or kubernetes client executed in container (user=%user.name user_loginuid=%user.loginuid %container.info parent=%proc.pname cmdline=%proc.cmdline image=%container.image.repository:%container.image.tag)"
   priority: WARNING
   tags: [container, mitre_execution]
@@ -2863,7 +2926,12 @@
 
 - rule: Packet socket created in container
   desc: Detect new packet socket at the device driver (OSI Layer 2) level in a container. Packet socket could be used for ARP Spoofing and privilege escalation(CVE-2020-14386) by attacker.
-  condition: evt.type=socket and evt.arg[0]=AF_PACKET and consider_packet_socket_communication and container and not proc.name in (user_known_packet_socket_binaries)
+  condition: >
+    evt.type = socket
+    and evt.arg[0] = AF_PACKET
+    and consider_packet_socket_communication
+    and container
+    and not proc.name in (user_known_packet_socket_binaries)
   output: Packet socket was created in a container (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline socket_info=%evt.args container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)
   priority: NOTICE
   tags: [network, mitre_discovery]
@@ -2892,11 +2960,11 @@
 - rule: Network Connection outside Local Subnet
   desc: Detect traffic to image outside local subnet.
   condition: >
-    enabled_rule_network_only_subnet and
-    inbound_outbound and
-    container and
-    not network_local_subnet and
-    k8s.ns.name in (namespace_scope_network_only_subnet)
+    enabled_rule_network_only_subnet
+    and inbound_outbound
+    and container
+    and not network_local_subnet
+    and k8s.ns.name in (namespace_scope_network_only_subnet)
   output: >
     Network connection outside local subnet
     (command=%proc.cmdline connection=%fd.name user=%user.name user_loginuid=%user.loginuid container_id=%container.id
@@ -2929,11 +2997,11 @@
   desc: Detect traffic that is not to authorized server process and port.
   condition: >
     allowed_port and
-    inbound_outbound and
-    container and
-    container.image.repository in (allowed_image) and
-    not proc.name in (authorized_server_binary) and
-    not fd.sport in (authorized_server_port)
+    and inbound_outbound
+    and container
+    and container.image.repository in (allowed_image)
+    and not proc.name in (authorized_server_binary)
+    and not fd.sport in (authorized_server_port)
   output: >
     Network connection outside authorized port and binary
     (command=%proc.cmdline connection=%fd.name user=%user.name user_loginuid=%user.loginuid container_id=%container.id
@@ -2946,7 +3014,13 @@
 
 - rule: Redirect STDOUT/STDIN to Network Connection in Container
   desc: Detect redirecting stdout/stdin to network connection in container (potential reverse shell).
-  condition: evt.type=dup and evt.dir=> and container and fd.num in (0, 1, 2) and fd.type in ("ipv4", "ipv6") and not user_known_stand_streams_redirect_activities
+  condition: >
+    evt.type = dup
+    and evt.dir = >
+    and container
+    and fd.num in (0, 1, 2)
+    and fd.type in ("ipv4", "ipv6")
+    and not user_known_stand_streams_redirect_activities
   output: >
     Redirect stdout/stdin to network connection (user=%user.name user_loginuid=%user.loginuid %container.info process=%proc.name parent=%proc.pname cmdline=%proc.cmdline terminal=%proc.tty container_id=%container.id image=%container.image.repository fd.name=%fd.name fd.num=%fd.num fd.type=%fd.type fd.sip=%fd.sip)
   priority: WARNING
@@ -2967,16 +3041,16 @@
 - rule: Container Drift Detected (chmod)
   desc: New executable created in a container due to chmod
   condition: >
-    chmod and
-    consider_all_chmods and
-    container and
-    not runc_writing_exec_fifo and
-    not runc_writing_var_lib_docker and
-    not user_known_container_drift_activities and
-    evt.rawres>=0 and
-    ((evt.arg.mode contains "S_IXUSR") or
-    (evt.arg.mode contains "S_IXGRP") or
-    (evt.arg.mode contains "S_IXOTH"))
+    chmod
+    and consider_all_chmods
+    and container
+    and not runc_writing_exec_fifo
+    and not runc_writing_var_lib_docker
+    and not user_known_container_drift_activities
+    and evt.rawres >= 0
+    and ((evt.arg.mode contains "S_IXUSR") or
+         (evt.arg.mode contains "S_IXGRP") or
+         (evt.arg.mode contains "S_IXOTH"))
   output: Drift detected (chmod), new executable created in a container (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline filename=%evt.arg.filename name=%evt.arg.name mode=%evt.arg.mode event=%evt.type)
   priority: ERROR
 
@@ -2986,13 +3060,13 @@
 - rule: Container Drift Detected (open+create)
   desc: New executable created in a container due to open+create
   condition: >
-    evt.type in (open,openat,creat) and
-    evt.is_open_exec=true and
-    container and
-    not runc_writing_exec_fifo and
-    not runc_writing_var_lib_docker and
-    not user_known_container_drift_activities and
-    evt.rawres>=0
+    evt.type in (open,openat,creat)
+    and evt.is_open_exec = true
+    and container
+    and not runc_writing_exec_fifo
+    and not runc_writing_var_lib_docker
+    and not user_known_container_drift_activities
+    and evt.rawres >= 0
   output: Drift detected (open+create), new executable created in a container (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline filename=%evt.arg.filename name=%evt.arg.name mode=%evt.arg.mode event=%evt.type)
   priority: ERROR
 
@@ -3001,7 +3075,9 @@
 
 - rule: Outbound Connection to C2 Servers
   desc: Detect outbound connection to command & control servers
-  condition: outbound and fd.sip in (c2_server_ip_list)
+  condition: >
+    outbound
+    and fd.sip in (c2_server_ip_list)
   output: Outbound connection to C2 server (command=%proc.cmdline connection=%fd.name user=%user.name user_loginuid=%user.loginuid container_id=%container.id image=%container.image.repository)
   priority: WARNING
   tags: [network]
@@ -3011,7 +3087,11 @@
 
 - rule: Linux Kernel Module Injection Detected
   desc: Detect kernel module was injected (from container).
-  condition: spawned_process and container and proc.name=insmod and not proc.args in (white_listed_modules)
+  condition: >
+    spawned_process
+    and container
+    and proc.name=insmod
+    and not proc.args in (white_listed_modules)
   output: Linux Kernel Module injection using insmod detected (user=%user.name user_loginuid=%user.loginuid parent_process=%proc.pname module=%proc.args %container.info image=%container.image.repository:%container.image.tag)
   priority: WARNING
   tags: [process]
@@ -3026,7 +3106,12 @@
 # Note the rule will not work as expected when usernamespace is applied, e.g. userns-remap is enabled.
 - rule: Container Run as Root User
   desc: Detected container running as root user
-  condition: spawned_process and container and proc.vpid=1 and user.uid=0 and not user_known_run_as_root_container
+  condition: >
+    spawned_process
+    and container
+    and proc.vpid=1
+    and user.uid=0
+    and not user_known_run_as_root_container
   enabled: false
   output: Container launched with root user privilege (uid=%user.uid container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)
   priority: INFO
@@ -3036,7 +3121,12 @@
 # A privilege escalation to root through heap-based buffer overflow
 - rule: Sudo Potential Privilege Escalation
   desc: Privilege escalation vulnerability affecting sudo (<= 1.9.5p2). Executing sudo using sudoedit -s or sudoedit -i command with command-line argument that ends with a single backslash character from an unprivileged user it's possible to elevate the user privileges to root.
-  condition: spawned_process and user.uid != 0 and proc.name=sudoedit and (proc.args contains -s or proc.args contains -i) and (proc.args contains "\ " or proc.args endswith \)
+  condition: >
+    spawned_process
+    and user.uid != 0
+    and proc.name=sudoedit
+    and (proc.args contains -s or proc.args contains -i)
+    and (proc.args contains "\ " or proc.args endswith \)
   output: "Detect Sudo Privilege Escalation Exploit (CVE-2021-3156) (user=%user.name parent=%proc.pname cmdline=%proc.cmdline %container.info)"
   priority: CRITICAL
   tags: [filesystem, mitre_privilege_escalation]
@@ -3044,7 +3134,8 @@
 - rule: Debugfs Launched in Privileged Container
   desc: Detect file system debugger debugfs launched inside a privileged container which might lead to container escape.
   condition: >
-    spawned_process and container
+    spawned_process
+    and container
     and container.privileged=true
     and proc.name=debugfs
   output: Debugfs launched started in a privileged container (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline %container.info image=%container.image.repository:%container.image.tag)
@@ -3057,7 +3148,8 @@
 - rule: Mount Launched in Privileged Container
   desc: Detect file system mount happened inside a privilegd container which might lead to container escape.
   condition: >
-    spawned_process and container
+    spawned_process
+    and container
     and container.privileged=true
     and proc.name=mount
     and not mount_info
@@ -3074,11 +3166,11 @@
 - rule: Unprivileged Delegation of Page Faults Handling to a Userspace Process
   desc: Detect a successful unprivileged userfaultfd syscall which might act as an attack primitive to exploit other bugs
   condition: >
-    consider_userfaultfd_activities and
-    evt.type = userfaultfd and
-    user.uid != 0 and
-    (evt.rawres >= 0 or evt.res != -1) and
-    not proc.name in (user_known_userfaultfd_processes)
+    consider_userfaultfd_activities
+    and evt.type = userfaultfd
+    and user.uid != 0
+    and (evt.rawres >= 0 or evt.res != -1)
+    and not proc.name in (user_known_userfaultfd_processes)
   output: An userfaultfd syscall was successfully executed by an unprivileged user (user=%user.name user_loginuid=%user.loginuid process=%proc.name command=%proc.cmdline %container.info image=%container.image.repository:%container.image.tag)
   priority: CRITICAL
   tags: [syscall, mitre_defense_evasion]
